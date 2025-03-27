@@ -1,26 +1,59 @@
 {
-  "name": "map",
-  "private": true,
+  "name": "vue-project",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "run-p type-check \"build-only {@}\" --",
+    "preview": "vite preview",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build",
+    "lint": "eslint . --fix",
+    "format": "prettier --write src/"
   },
   "dependencies": {
+    "@coders-tm/vue-number-format": "^3.35.3",
+    "@geoman-io/leaflet-geoman-free": "^2.18.3",
+    "@googlemaps/js-api-loader": "^1.16.8",
+    "@turf/turf": "^7.2.0",
+    "@types/proj4": "^2.5.6",
     "@vue-leaflet/vue-leaflet": "^0.10.1",
-    "axios": "^1.8.3",
+    "axios": "^1.8.4",
+    "cleave.js": "^1.6.0",
+    "element-plus": "^2.9.7",
     "leaflet": "^1.9.4",
-    "leaflet-draw": "^1.0.2",
+    "leaflet-draw": "^1.0.4",
+    "leaflet-geometryutil": "^0.10.3",
+    "leaflet-snap": "^0.0.4",
+    "leaflet.gridlayer.googlemutant": "^0.15.0",
+    "pinia": "^3.0.1",
     "proj4": "^2.15.0",
-    "shapefile": "^0.6.6",
     "shpjs": "^6.1.0",
     "vue": "^3.5.13",
-    "vue-leaflet": "^0.1.0"
+    "vue-number-format": "^1.3.1",
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@tsconfig/node22": "^22.0.0",
+    "@types/cleave.js": "^1.4.12",
+    "@types/leaflet": "^1.9.17",
+    "@types/node": "^22.13.9",
+    "@types/shpjs": "^3.4.7",
     "@vitejs/plugin-vue": "^5.2.1",
-    "vite": "^6.2.0"
+    "@vitejs/plugin-vue-jsx": "^4.1.1",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.5.0",
+    "@vue/tsconfig": "^0.7.0",
+    "eslint": "^9.21.0",
+    "eslint-plugin-vue": "~10.0.0",
+    "jiti": "^2.4.2",
+    "npm-run-all2": "^7.0.2",
+    "prettier": "3.5.3",
+    "typescript": "~5.8.0",
+    "unplugin-vue-components": "^28.4.1",
+    "vite": "^6.2.1",
+    "vite-plugin-vue-devtools": "^7.7.2",
+    "vue-tsc": "^2.2.8"
   }
 }
