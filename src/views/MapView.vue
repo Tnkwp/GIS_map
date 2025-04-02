@@ -1,5 +1,4 @@
 <template>
-  <input v-model="searchQuery" @keyup.enter="searchLocation" placeholder="ค้นหาสถานที่" class="absolute top-5 left-1/2 transform -translate-x-1/2 bg-white p-2 rounded border" />
   <div id="map" class="h-screen w-full relative" style="position: relative; z-index: 0"></div>
   <div class="" style="
       position: absolute;
@@ -27,40 +26,22 @@ import 'leaflet-geometryutil'
 import * as shp from 'shpjs'
 import proj4 from 'proj4'
 
-// กำหนดระบบพิกัด (UTM Zone 47N)
 const utmProjection = 'EPSG:32647'
-const searchQuery = ref('')
 
-const searchLocation = async () => {
-  if (!searchQuery.value) return
-  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery.value}`)
-  const data = await res.json()
-
-  if (data.length > 0) {
-    const { lat, lon } = data[0]
-    map.setView([lat, lon], 15)
-    L.marker([lat, lon]).addTo(map)
-  }
-}
-
-// แปลงพิกัดจาก UTM ไปเป็น WGS84 (Lat/Lng)
 type UTMCoordinates = [number, number]
 
 const convertUtmToLatLng = (utmCoords: UTMCoordinates): [number, number] | null => {
   try {
-    // Validate input coordinates
     if (!Array.isArray(utmCoords) || utmCoords.length !== 2) {
       console.error('Invalid UTM coordinates: Expected an array of [easting, northing].')
       return null
     }
     const [easting, northing] = utmCoords
 
-    // Check if the coordinates are finite numbers
     if (!isFinite(easting) || !isFinite(northing)) {
       return null
     }
 
-    // Assuming 'utmProjection' is defined somewhere as a valid projection, e.g., a string like 'EPSG:32633'
     return proj4(utmProjection, 'EPSG:4326', utmCoords) as [number, number]
   } catch (error) {
     console.error('Error converting UTM to Lat/Lng:', error)
@@ -235,7 +216,6 @@ onMounted(async () => {
           console.warn(`Unsupported geometry type at index ${index}:`, geometry);
         }
 
-        // Add the geometry to the filterGroup for shapefile-based filtering
         if (layer) {
           layer.addTo(filterGroup);
         }
@@ -366,8 +346,8 @@ onMounted(async () => {
       if (Array.isArray(latLngs) && latLngs.length > 0) {
         const middleIndex = Math.floor(latLngs.length / 2);
         latlng = Array.isArray(latLngs[0])
-          ? (latLngs[0] as L.LatLng[])[middleIndex]  // Handle MultiLineString
-          : latLngs[middleIndex] as L.LatLng; // Handle single LineString
+          ? (latLngs[0] as L.LatLng[])[middleIndex]
+          : latLngs[middleIndex] as L.LatLng;
       }
     }
 
@@ -415,7 +395,6 @@ onMounted(async () => {
 
       map.closePopup(popup)
 
-      // Log all saved shapes after saving
       console.log('Saved shape data:', layer.properties)
 
       test.value.push(layer)
@@ -423,7 +402,6 @@ onMounted(async () => {
       console.log('Saved All Shapes', test.value)
     }
 
-    // HOVER
     layer.on('mouseover', (e) => {
       if (!layer.properties) {
         return
