@@ -1,8 +1,7 @@
 <template>
+  <input v-model="searchQuery" @keyup.enter="searchLocation" placeholder="ค้นหาสถานที่" class="absolute top-5 left-1/2 transform -translate-x-1/2 bg-white p-2 rounded border" />
   <div id="map" class="h-screen w-full relative" style="position: relative; z-index: 0"></div>
-  <div
-    class=""
-    style="
+  <div class="" style="
       position: absolute;
       bottom: 10px;
       right: 20%;
@@ -13,8 +12,7 @@
       border: 2px solid rgba(0, 0, 0, 0.2);
       z-index: 1000;
       font-size: 15px;
-    "
-  >
+    ">
     Lat: <span id="lat">0.000000</span>, Lng: <span id="lng">0.000000</span>
   </div>
 </template>
@@ -31,6 +29,19 @@ import proj4 from 'proj4'
 
 // กำหนดระบบพิกัด (UTM Zone 47N)
 const utmProjection = 'EPSG:32647'
+const searchQuery = ref('')
+
+const searchLocation = async () => {
+  if (!searchQuery.value) return
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${searchQuery.value}`)
+  const data = await res.json()
+
+  if (data.length > 0) {
+    const { lat, lon } = data[0]
+    map.setView([lat, lon], 15)
+    L.marker([lat, lon]).addTo(map)
+  }
+}
 
 // แปลงพิกัดจาก UTM ไปเป็น WGS84 (Lat/Lng)
 type UTMCoordinates = [number, number]
@@ -110,29 +121,20 @@ onMounted(async () => {
     'Google Streets': L.tileLayer('https://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
       attribution: 'Google',
     }),
-    // 'Google Satellite': (L.gridLayer as any).googleMutant({
-    //   type: 'satellite',
-    // }),
-    // 'Google Hybrid': (L.gridLayer as any).googleMutant({
-    //   type: 'hybrid',
-    // }),
-    // 'Google Terrain': (L.gridLayer as any).googleMutant({
-    //   type: 'terrain',
-    // }),
     OpenStreetMap: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map),
   }
 
   // ฟังก์ชันหลักในการโหลด shapefile
-  async function loadShapefile(filePath: string, featureGroups: FeatureGroups): Promise<void> {
+  async function loadShapefile(filePath: string, featureGroups: FeatureGroups, filterGroup: L.FeatureGroup): Promise<void> {
     try {
-      const response = await fetch(filePath)
-      const arrayBuffer = await response.arrayBuffer()
-      const rawGeojson = await shp.parseShp(arrayBuffer)
+      const response = await fetch(filePath);
+      const arrayBuffer = await response.arrayBuffer();
+      const rawGeojson = await shp.parseShp(arrayBuffer);
 
       if (!rawGeojson || !Array.isArray(rawGeojson)) {
-        throw new Error(`Invalid GeoJSON data from ${filePath}`)
+        throw new Error(`Invalid GeoJSON data from ${filePath}`);
       }
 
       const transformedGeojson = {
@@ -142,116 +144,133 @@ onMounted(async () => {
           geometry: geometry,
           properties: {},
         })),
-      }
+      };
 
       transformedGeojson.features.forEach((feature, index) => {
-        const { geometry } = feature
+        const { geometry } = feature;
 
         if (!geometry || !geometry.type || !geometry.coordinates) {
-          return
+          return;
         }
 
-        const coords = geometry.coordinates
+        const coords = geometry.coordinates;
+        let layer: L.Layer | null = null;
 
-        // Handle different geometry types and assign them to the respective feature group
         if (geometry.type === 'Point') {
-          const latLng = convertUtmToLatLng([coords[0], coords[1]])
+          const latLng = convertUtmToLatLng([coords[0], coords[1]]);
           if (latLng) {
-            L.marker([latLng[1], latLng[0]]).addTo(featureGroups.point)
+            layer = L.marker([latLng[1], latLng[0]]);
+            layer.addTo(featureGroups.point);
           }
         } else if (geometry.type === 'MultiLineString') {
           coords.forEach((line: any[]) => {
             const latLngLine = line
               .map((coord) => {
                 if (Array.isArray(coord) && coord.length >= 2) {
-                  const latLng = convertUtmToLatLng([coord[0], coord[1]])
-                  return latLng ? [latLng[1], latLng[0]] : null
+                  const latLng = convertUtmToLatLng([coord[0], coord[1]]);
+                  return latLng ? [latLng[1], latLng[0]] : null;
                 }
-                return null
+                return null;
               })
-              .filter(Boolean)
+              .filter(Boolean);
 
             if (latLngLine.length > 1) {
-              L.polyline(latLngLine, { color: 'red', weight: 2 }).addTo(
-                featureGroups.multipleLineString,
-              )
+              layer = L.polyline(latLngLine, { color: 'red', weight: 2 });
+              layer.addTo(featureGroups.multipleLineString);
             }
-          })
+          });
         } else if (geometry.type === 'LineString') {
           const latLngLine = coords
             .map((coord) => {
               if (Array.isArray(coord) && coord.length >= 2) {
-                const latLng = convertUtmToLatLng([coord[0], coord[1]])
-                return latLng ? [latLng[1], latLng[0]] : null
+                const latLng = convertUtmToLatLng([coord[0], coord[1]]);
+                return latLng ? [latLng[1], latLng[0]] : null;
               }
-              return null
+              return null;
             })
-            .filter(Boolean)
+            .filter(Boolean);
 
           if (latLngLine.length > 1) {
-            L.polyline(latLngLine, { color: 'blue', weight: 2 }).addTo(featureGroups.lineString)
+            layer = L.polyline(latLngLine, { color: 'blue', weight: 2 });
+            layer.addTo(featureGroups.lineString);
           }
         } else if (geometry.type === 'Polygon') {
           const latLngPolygon = coords[0]
             .map((coord) => {
               if (Array.isArray(coord) && coord.length >= 2) {
-                const latLng = convertUtmToLatLng([coord[0], coord[1]])
-                return latLng ? [latLng[1], latLng[0]] : null
+                const latLng = convertUtmToLatLng([coord[0], coord[1]]);
+                return latLng ? [latLng[1], latLng[0]] : null;
               }
-              return null
+              return null;
             })
-            .filter(Boolean)
+            .filter(Boolean);
 
           if (latLngPolygon.length > 2) {
-            L.polygon(latLngPolygon, { color: 'green', weight: 2 }).addTo(featureGroups.polygon)
+            layer = L.polygon(latLngPolygon, { color: 'green', weight: 2 });
+            layer.addTo(featureGroups.polygon);
           }
         } else if (geometry.type === 'MultiPolygon') {
           coords.forEach((polygonCoords: any[]) => {
             const latLngPolygon = polygonCoords
               .map((coord) => {
                 if (Array.isArray(coord) && coord.length >= 2) {
-                  const latLng = convertUtmToLatLng([coord[0], coord[1]])
-                  return latLng ? [latLng[1], latLng[0]] : null
+                  const latLng = convertUtmToLatLng([coord[0], coord[1]]);
+                  return latLng ? [latLng[1], latLng[0]] : null;
                 }
-                return null
+                return null;
               })
-              .filter(Boolean)
+              .filter(Boolean);
 
             if (latLngPolygon.length > 2) {
-              L.polygon(latLngPolygon, {
+              layer = L.polygon(latLngPolygon, {
                 color: 'purple',
                 weight: 2,
                 fillColor: '#ff00ff',
                 fillOpacity: 0.5,
-              }).addTo(featureGroups.multiplePolygon)
+              });
+              layer.addTo(featureGroups.multiplePolygon);
             }
-          })
+          });
         } else {
-          console.warn(`Unsupported geometry type at index ${index}:`, geometry)
+          console.warn(`Unsupported geometry type at index ${index}:`, geometry);
         }
-      })
+
+        // Add the geometry to the filterGroup for shapefile-based filtering
+        if (layer) {
+          layer.addTo(filterGroup);
+        }
+      });
     } catch (error) {
-      console.error(`Error loading shapefile from ${filePath}:`, error)
+      console.error(`Error loading shapefile from ${filePath}:`, error);
     }
   }
+
+  const filterAreas = {
+    'แปลงที่ดิน_bangsue': L.featureGroup().addTo(map),
+    'เส้นรางทางประธาน': L.featureGroup().addTo(map),
+    'แนวเขตกรรมสิทธิ์ที่ดินรถไฟ(R.O.W.)': L.featureGroup().addTo(map),
+  };
 
   // Call the function for multiple files
   const shapefiles = [
     {
       path: '/แปลงที่ดิน_bangsue.shp',
       groups: { drawnItems, lineString, multipleLineString, polygon, multiplePolygon, point },
+      filterGroup: filterAreas['แปลงที่ดิน_bangsue'],
     },
     {
       path: '/เส้นรางทางประธาน.shp',
       groups: { drawnItems, lineString, multipleLineString, polygon, multiplePolygon, point },
+      filterGroup: filterAreas['เส้นรางทางประธาน'],
     },
     {
       path: '/แนวเขตกรรมสิทธิ์ที่ดินรถไฟ(R.O.W.).shp',
       groups: { drawnItems, lineString, multipleLineString, polygon, multiplePolygon, point },
+      filterGroup: filterAreas['แนวเขตกรรมสิทธิ์ที่ดินรถไฟ(R.O.W.)'],
     },
   ]
 
-  shapefiles.forEach(({ path, groups }) => loadShapefile(path, groups))
+  shapefiles.forEach(({ path, groups, filterGroup }) => loadShapefile(path, groups, filterGroup))
 
   // Add feature groups to the map
   map.addLayer(drawnItems)
@@ -261,18 +280,23 @@ onMounted(async () => {
   map.addLayer(multiplePolygon)
   map.addLayer(point)
 
+  Object.values(filterAreas).forEach((filterGroup) => map.addLayer(filterGroup));
+
   const overlayMaps = {
     Drawn: drawnItems,
     LineString: lineString,
     MultipleLineString: multipleLineString,
     Polygon: polygon,
     MultiplePolygon: multiplePolygon,
-    Point: point,
+    Point: point
   }
 
   const filterArea = {
     'พื้นที่ A': L.featureGroup().addTo(map),
     'พื้นที่ B': L.featureGroup().addTo(map),
+    'แปลงที่ดิน_bangsue': filterAreas['แปลงที่ดิน_bangsue'],
+    'เส้นรางทางประธาน': filterAreas['เส้นรางทางประธาน'],
+    'แนวเขตกรรมสิทธิ์ที่ดินรถไฟ(R.O.W.)': filterAreas['แนวเขตกรรมสิทธิ์ที่ดินรถไฟ(R.O.W.)'],
   }
 
   L.control.layers(baseMaps, overlayMaps, { collapsed: false }).addTo(map)
@@ -285,7 +309,7 @@ onMounted(async () => {
   map.pm.addControls({
     position: 'topleft',
     drawCircle: true,
-    drawCircleMarker: true,
+    drawCircleMarker: false,
     drawPolyline: true,
     drawPolygon: true,
     drawMarker: true,
@@ -328,16 +352,23 @@ onMounted(async () => {
     actions: actions,
   })
 
-  //
-
   // SHAPE CREATED
   map.on('pm:create', (e) => {
-    const layer = e.layer as CustomLayer
-    let latlng: L.LatLng
+    const layer = e.layer as CustomLayer;
+    let latlng: L.LatLng;
+
     if (layer instanceof L.Circle || layer instanceof L.Rectangle || layer instanceof L.Polygon) {
-      latlng = layer.getBounds().getCenter()
-    } else {
-      latlng = (layer as L.Marker).getLatLng()
+      latlng = layer.getBounds().getCenter();
+    } else if (layer instanceof L.Marker) {
+      latlng = layer.getLatLng();
+    } else if (layer instanceof L.Polyline) {
+      const latLngs = layer.getLatLngs();
+      if (Array.isArray(latLngs) && latLngs.length > 0) {
+        const middleIndex = Math.floor(latLngs.length / 2);
+        latlng = Array.isArray(latLngs[0])
+          ? (latLngs[0] as L.LatLng[])[middleIndex]  // Handle MultiLineString
+          : latLngs[middleIndex] as L.LatLng; // Handle single LineString
+      }
     }
 
     const popUpCreate = `
